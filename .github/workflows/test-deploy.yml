@@ -1,0 +1,32 @@
+# .github/workflows/test-deploy.yml
+name: Test Build (Pull Request)
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  test-deploy:
+    name: Test Docusaurus build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Test build (không deploy)
+        run: npm run build
+
+      # ⭐ Optional: Check broken links
+      - name: Check for broken links
+        run: npm run build -- --out-dir /tmp/build-test
+        continue-on-error: true  # Warn, không fail hard

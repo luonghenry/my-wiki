@@ -1,0 +1,71 @@
+# .github/workflows/deploy.yml
+name: Deploy Docusaurus to GitHub Pages
+
+on:
+  push:
+    branches:
+      - main
+
+# Cấp quyền cho GITHUB_TOKEN để deploy
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Chỉ cho 1 deployment chạy cùng lúc
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  # ── Job 1: Build ──────────────────────────────
+  build:
+    name: Build Docusaurus
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Cần full history cho versioning
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm  # ← Tự cache ~/.npm theo package-lock.json
+
+      - name: Install dependencies
+        run: npm ci  # ci = faster, reproducible, no package-lock changes
+
+      # ⭐ Cache Docusaurus build artifacts
+      - name: Cache Docusaurus build
+        uses: actions/cache@v4
+        with:
+          path: |
+            node_modules/.cache
+            .docusaurus
+          key: ${{ runner.os }}-docusaurus-${{ hashFiles('docusaurus.config.js') }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-docusaurus-${{ hashFiles('docusaurus.config.js') }}-
+            ${{ runner.os }}-docusaurus-
+
+      - name: Build website
+        run: npm run build
+
+      - name: Upload build artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: build  # Docusaurus build output
+
+  # ── Job 2: Deploy ─────────────────────────────
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build  # Chạy SAU khi build thành công
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}  # Hiển thị URL sau deploy
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
